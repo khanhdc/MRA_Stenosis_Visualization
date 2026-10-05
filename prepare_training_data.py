@@ -210,18 +210,29 @@ def build_crop_mask(vol_crop, method=None, threshold=None, gamma=None,
     else:
         binary = np.zeros(binary.shape, dtype=np.uint8)
 
+    # Remember which voxels belong to the annotated vessel. Closing below
+    # re-labels the components, so component ids cannot be trusted afterwards -
+    # the voxel set has to be captured here.
+    seed_voxels = (binary > 0).copy()
+
     # Light per-slice closing (NO opening - it erodes faint vessels).
     if close_radius and close_radius > 0:
         struct = disk(close_radius)
         for i in range(binary.shape[0]):
             binary[i] = closing(binary[i], struct).astype(np.uint8)
 
-    # Remove small blobs.
+    # Remove small blobs, but never the annotated vessel: a severe stenosis can
+    # legitimately be only a few voxels, and dropping it would silently produce
+    # an empty mask for a case the annotator still has to label.
     if min_area and min_area > 0:
         labelled = sk_label(binary)
         for region in regionprops(labelled):
-            if region.area < min_area:
-                binary[labelled == region.label] = 0
+            if region.area >= min_area:
+                continue
+            sel = labelled == region.label
+            if (sel & seed_voxels).any():
+                continue
+            binary[sel] = 0
 
     return binary.astype(np.uint8)
 
