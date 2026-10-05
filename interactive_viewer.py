@@ -55,8 +55,11 @@ DEFAULTS = {
 }
 METHOD_RADIO_INDEX = {"otsu": 0, "frangi": 1}
 
-# Volumes on disk are pre-cropped by the pipeline to (17, CROP_SIZE, CROP_SIZE).
-CROP_SIZE = 17
+# Volumes on disk are pre-cropped by the pipeline to
+# (slices_per_case, crop_size, crop_size). Read both from config so this
+# can never drift from what batch_run actually wrote.
+SLICES_PER_CASE = CFG.get("slices_per_case", 17)
+CROP_SIZE = CFG.get("crop_size", 17)
 # Cerebral arteries measure ~3-6 px on this protocol; beyond 12 px the
 # mask has almost certainly bled into adjacent bright tissue.
 MAX_PLAUSIBLE_DIA_PX = 12.0
@@ -141,7 +144,8 @@ class ViewerState:
 def load_case(i):
     """Load cropped volume + mask + box info for case index i.
 
-    Volumes on disk are already cropped to (17, CROP_SIZE, CROP_SIZE) by the
+    Volumes on disk are already cropped to
+    (SLICES_PER_CASE, CROP_SIZE, CROP_SIZE) by the
     pipeline, with the crop origin stored in the NIfTI affine offset.
     """
     st = ViewerState()

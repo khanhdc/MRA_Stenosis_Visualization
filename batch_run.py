@@ -149,6 +149,9 @@ def main():
     ptd.OTSU_SIGMA = cfg.get("otsu_sigma", ptd.OTSU_SIGMA)
     ptd.CENTER_SEED_RADIUS = cfg.get("center_seed_radius", ptd.CENTER_SEED_RADIUS)
     ptd.CROP_SIZE = cfg.get("crop_size", ptd.CROP_SIZE)
+    # export_manual validates the expected shape from config, so the batch
+    # writer must honour the same value or the two disagree.
+    ptd.SLICES_PER_CASE = cfg.get("slices_per_case", ptd.SLICES_PER_CASE)
     vcfg = cfg.get("vesselness", {})
     ptd.VESSELNESS_SIGMAS = vcfg.get("sigmas", ptd.VESSELNESS_SIGMAS)
     ptd.VESSELNESS_BLACK_RIDGE = vcfg.get("black_ridges", ptd.VESSELNESS_BLACK_RIDGE)

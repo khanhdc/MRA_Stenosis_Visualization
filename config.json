@@ -5,7 +5,7 @@
   "slices_per_case": 17,
   "middle_slice_index": 8,
   "box_expansion_margin": 0.4,
-  "crop_size": 17,
+  "crop_size": 24,
   "manual_data_dir": "training_data_manual",
   "mask_method": "otsu",
   "otsu_scale": 0.8,
