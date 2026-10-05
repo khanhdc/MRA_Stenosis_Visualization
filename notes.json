@@ -1,0 +1,81 @@
+{
+  "categories": [
+    {
+      "id": 0,
+      "name": "ACA-L"
+    },
+    {
+      "id": 1,
+      "name": "ACA-R"
+    },
+    {
+      "id": 2,
+      "name": "Acom"
+    },
+    {
+      "id": 3,
+      "name": "Basilar"
+    },
+    {
+      "id": 4,
+      "name": "ICA-L"
+    },
+    {
+      "id": 5,
+      "name": "ICA-R"
+    },
+    {
+      "id": 6,
+      "name": "MCA-L"
+    },
+    {
+      "id": 7,
+      "name": "MCA-R"
+    },
+    {
+      "id": 8,
+      "name": "Mild Stenosis"
+    },
+    {
+      "id": 9,
+      "name": "Moderate Stenosis"
+    },
+    {
+      "id": 10,
+      "name": "PCA-L"
+    },
+    {
+      "id": 11,
+      "name": "PCA-R"
+    },
+    {
+      "id": 12,
+      "name": "Pcom-L"
+    },
+    {
+      "id": 13,
+      "name": "Pcom-R"
+    },
+    {
+      "id": 14,
+      "name": "Severe Stenosis"
+    },
+    {
+      "id": 15,
+      "name": "Severe to Occlusion"
+    },
+    {
+      "id": 16,
+      "name": "VA-L"
+    },
+    {
+      "id": 17,
+      "name": "VA-R"
+    }
+  ],
+  "info": {
+    "year": 2025,
+    "version": "1.0",
+    "contributor": "Label Studio"
+  }
+}

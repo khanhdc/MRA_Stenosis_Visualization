@@ -1,0 +1,32 @@
+# ============================================================
+# Source MRA scans - ~750 MB of patient data, never versioned.
+# The 134 patient folders are named by ID (500 .. 794).
+# ============================================================
+[0-9][0-9][0-9]/
+
+# Ad-hoc working folders
+Selected/
+test/
+
+# Auto-generated pseudo-masks. Regenerate with:
+#   python batch_run.py
+# The manual set below is the one that trains the model, so this
+# directory does not need history.
+training_data/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# Editor / OS noise
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*~

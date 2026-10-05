@@ -1,0 +1,18 @@
+ACA-L
+ACA-R
+Acom
+Basilar
+ICA-L
+ICA-R
+MCA-L
+MCA-R
+Mild Stenosis
+Moderate Stenosis
+PCA-L
+PCA-R
+Pcom-L
+Pcom-R
+Severe Stenosis
+Severe to Occlusion
+VA-L
+VA-R

@@ -1,0 +1,163 @@
+{
+  "input_dir": "E:/MRA_Data/MRA_Annotation_Ver2/stenosis labeling",
+  "output_dir": "E:/MRA_Data/MRA_Annotation_Ver2/stenosis labeling/training_data",
+  "classes_file": "classes.txt",
+  "slices_per_case": 17,
+  "middle_slice_index": 8,
+  "box_expansion_margin": 0.4,
+  "crop_size": 17,
+  "manual_data_dir": "training_data_manual",
+  "mask_method": "otsu",
+  "otsu_scale": 0.8,
+  "otsu_sigma": 1.0,
+  "center_seed_radius": 3,
+  "case_overrides": {
+    "2019-02-13_right ICA": {
+      "method": "otsu",
+      "threshold": 0.14,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 0.96
+    },
+    "2019-02-13_left ICA": {
+      "method": "otsu",
+      "threshold": 0.66,
+      "vesselness": {
+        "gamma": 0.8
+      },
+      "otsu_scale": 0.91
+    },
+    "2019-03-18_right MCA": {
+      "method": "otsu",
+      "threshold": 0.15,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 0.93
+    },
+    "2019-05-17_right ICA": {
+      "method": "otsu",
+      "threshold": 0.15,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 0.86
+    },
+    "2019-07-09_left VA": {
+      "method": "otsu",
+      "threshold": 0.15,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 0.9
+    },
+    "2019-07-22_right MCA": {
+      "method": "otsu",
+      "threshold": 0.15,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 0.86
+    },
+    "2019-08-21_left MCA": {
+      "method": "frangi",
+      "threshold": 0.025,
+      "vesselness": {
+        "gamma": 1.8
+      },
+      "otsu_scale": 0.66
+    },
+    "2019-08-21_right MCA": {
+      "method": "otsu",
+      "threshold": 0.15,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 1.08
+    },
+    "2019-08-31_left ICA": {
+      "method": "otsu",
+      "threshold": 0.15,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 0.99
+    },
+    "2019-08-31_right ICA": {
+      "method": "otsu",
+      "threshold": 0.15,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 1.07
+    },
+    "2019-09-10_left ICA": {
+      "method": "otsu",
+      "threshold": 0.15,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 0.84
+    },
+    "2019-09-10_left PCA": {
+      "method": "otsu",
+      "threshold": 0.025,
+      "vesselness": {
+        "gamma": 4.65
+      },
+      "otsu_scale": 1.15
+    },
+    "2019-09-10_right ICA": {
+      "method": "otsu",
+      "threshold": 0.15,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 1.13
+    },
+    "2019-09-26_BA": {
+      "method": "otsu",
+      "threshold": 0.15,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 0.87
+    },
+    "2019-10-10_left MCA": {
+      "method": "otsu",
+      "threshold": 0.15,
+      "vesselness": {
+        "gamma": 0.5
+      },
+      "otsu_scale": 0.84
+    },
+    "2019-02-13_right ACA": {
+      "method": "otsu",
+      "threshold": 0.01,
+      "vesselness": {
+        "gamma": 0.2
+      },
+      "otsu_scale": 0.77
+    }
+  },
+  "vesselness": {
+    "sigmas": [
+      1.0,
+      1.5,
+      2.0,
+      3.0
+    ],
+    "black_ridges": false,
+    "alpha": 0.5,
+    "beta": 0.5,
+    "gamma": 0.5
+  },
+  "threshold_relative": 0.15,
+  "morphology": {
+    "close_radius": 1
+  },
+  "min_component_area_px": 5,
+  "save_visualizations": true,
+  "visualization_dpi": 150
+}
