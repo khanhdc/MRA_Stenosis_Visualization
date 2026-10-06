@@ -138,6 +138,47 @@ def draw_wireframe(ax, w, h, d, color="0.4", lw=0.8, scale=(1.0, 1.0, 1.0)):
                 ax.plot(xs, ys, zs, color=color, lw=lw)
 
 
+SLICE_PLANE_COLOR = "cyan"
+
+
+def draw_slice_plane(ax, mask_volume, slice_idx, z_scale=1.0):
+    """Show where the slice slider currently is, inside the 3D cube.
+
+    Draws a translucent quad across the full cross-section at the active slice,
+    plus the mask voxels on that slice so the vessel cross-section is visible in
+    3D context rather than only in the 2D panels.
+
+    `z_scale` differs per window: the dots view uses raw slice indices for z,
+    while the smooth view builds its mesh with spacing (1.5, 1, 1), so the same
+    slice sits at a different z there.
+
+    Takes the whole volume so the slice index is clamped here - callers must
+    never index with an unvalidated value.
+    """
+    if slice_idx is None:
+        return
+    n_sl, h, w = mask_volume.shape
+    if n_sl <= 0:
+        return
+    slice_idx = int(np.clip(slice_idx, 0, n_sl - 1))
+    z_pos = slice_idx * z_scale
+
+    # Full cross-section quad at the active slice.
+    quad_z = np.full((2, 2), float(z_pos))
+    ax.plot_surface(
+        [0, w], [0, h], quad_z,
+        color=SLICE_PLANE_COLOR, alpha=0.15, edgecolor=SLICE_PLANE_COLOR,
+        linewidth=0.8, shade=False, zorder=1,
+    )
+
+    # Mark the mask voxels on this slice so the plane is not just a marker.
+    yy, xx = np.nonzero(np.asarray(mask_volume[slice_idx]) > 0)
+    if len(xx) > 0:
+        ax.scatter(xx, yy, np.full(len(xx), z_pos), c=SLICE_PLANE_COLOR,
+                   s=16, alpha=0.95, depthshade=False, linewidths=0,
+                   zorder=2)
+
+
 class ViewerState:
     pass
 
@@ -270,7 +311,7 @@ fig3d_v1.tight_layout()
 dots3d = [None]
 
 
-def render_3d_v1(mask_volume):
+def render_3d_v1(mask_volume, slice_idx=None):
     if dots3d[0] is not None:
         dots3d[0].remove()
         dots3d[0] = None
@@ -287,8 +328,13 @@ def render_3d_v1(mask_volume):
         colors = plt.cm.viridis_r(norm(z))
         dots3d[0] = ax_3d_v1.scatter(x, y, z, c=colors, s=45, alpha=0.9)
 
-    draw_wireframe(ax_3d_v1, w, h, n_sl3, scale=(1.0, 1.0, 1.5))
-    ax_3d_v1.set_title(f"V1_3D Mask (dots)  |  voxels={int(mask_volume.sum())}")
+    # Uniform scale: z is the raw slice index, so scaling z by 1.5 pushed the
+    # box 8.5 units past zlim and clipped its top off.
+    draw_wireframe(ax_3d_v1, w, h, n_sl3, scale=(1.0, 1.0, 1.0))
+    draw_slice_plane(ax_3d_v1, mask_volume, slice_idx, z_scale=1.0)
+    ax_3d_v1.set_title(
+        f"V1_3D Mask (dots)  |  voxels={int(mask_volume.sum())}"
+        + (f"  |  slice {int(slice_idx)}" if slice_idx is not None else ""))
     ax_3d_v1.view_init(elev=25, azim=-60)
 
 
@@ -305,7 +351,7 @@ fig3d.tight_layout()
 surface3d = [None]
 
 
-def render_3d(mask_volume):
+def render_3d(mask_volume, slice_idx=None):
     if surface3d[0] is not None:
         surface3d[0].remove()
         surface3d[0] = None
@@ -314,8 +360,13 @@ def render_3d(mask_volume):
     n_sl3, h, w = mask_volume.shape
     if int(mask_volume.sum()) < 8:
         ax_3d.set_xlim(0, w); ax_3d.set_ylim(h, 0); ax_3d.set_zlim(0, n_sl3)
-        draw_wireframe(ax_3d, w, h, n_sl3, scale=(1.0, 1.0, 1.5))
-        ax_3d.set_title(f"V2_3D Mask (smooth)  |  voxels={int(mask_volume.sum())}")
+        draw_wireframe(ax_3d, w, h, n_sl3, scale=(1.0, 1.0, 1.0))
+        # Small masks are exactly the severe-stenosis cases where knowing the
+        # slice position matters most, so keep the plane on this branch too.
+        draw_slice_plane(ax_3d, mask_volume, slice_idx, z_scale=1.0)
+        ax_3d.set_title(
+            f"V2_3D Mask (smooth)  |  voxels={int(mask_volume.sum())}"
+            + (f"  |  slice {int(slice_idx)}" if slice_idx is not None else ""))
         ax_3d.view_init(elev=25, azim=-60)
         return
 
@@ -339,13 +390,17 @@ def render_3d(mask_volume):
 
     ax_3d.auto_scale_xyz([0, w * spacing[1]], [0, h * spacing[1]], [0, n_sl3 * spacing[0]])
     draw_wireframe(ax_3d, w, h, n_sl3, scale=spacing)
-    ax_3d.set_title(f"V2_3D Mask (smooth)  |  voxels={int(mask_volume.sum())}")
+    # The mesh was built with spacing (1.5, 1, 1), so slice z is 1.5x the index.
+    draw_slice_plane(ax_3d, mask_volume, slice_idx, z_scale=spacing[0])
+    ax_3d.set_title(
+        f"V2_3D Mask (smooth)  |  voxels={int(mask_volume.sum())}"
+        + (f"  |  slice {int(slice_idx)}" if slice_idx is not None else ""))
     ax_3d.view_init(elev=25, azim=-60)
 
 
-def render_all_3d(mask_volume):
-    render_3d_v1(mask_volume)
-    render_3d(mask_volume)
+def render_all_3d(mask_volume, slice_idx=None):
+    render_3d_v1(mask_volume, slice_idx)
+    render_3d(mask_volume, slice_idx)
 
 
 # =========================== TITLE ===========================
@@ -490,7 +545,7 @@ def update_plot():
     im1.set_data(disp)
     im1c.set_data(mask[s])
     im2.set_data(mask[s])
-    render_all_3d(mask)
+    render_all_3d(mask, s)
     title.set_text(
         f"{state.name}  |  crop=({state.x0},{state.y0})  |  slice {s}/{n_sl-1}  |  "
         f"mode={get_method()}  |  thr={thr_slider.val:.3f}  |  gamma={gamma_slider.val:.2f}"
