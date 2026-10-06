@@ -36,6 +36,7 @@ import prepare_training_data as ptd
 BASE = Path(__file__).parent
 CONFIG_PATH = BASE / "config.json"
 MANIFEST_NAME = "manual_labels.json"
+IGNORE_NAME = "ignored_cases.json"
 EXPECTED_SHAPE = None  # derived from CROP_SIZE at runtime
 
 
@@ -77,6 +78,19 @@ def load_manifest(manual_dir: Path):
 def save_manifest(manual_dir: Path, manifest: dict):
     with open(manual_dir / MANIFEST_NAME, "w") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)
+
+
+def load_ignored(manual_dir: Path):
+    """Cases marked 'no stenosis' in the viewer. Excluded from training."""
+    path = manual_dir / IGNORE_NAME
+    if not path.exists():
+        return {}
+    try:
+        with open(path) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 
 def params_from_record(rec: dict):
@@ -166,6 +180,8 @@ def cmd_verify(cfg, manual_dir: Path, auto_dir: Path):
     expected = (cfg.get("slices_per_case", 17), crop, crop)
     manifest = load_manifest(manual_dir)
     manual_ids = set(manifest)
+    ignored = load_ignored(manual_dir)
+    ignored_ids = set(ignored)
 
     imgs = sorted((manual_dir / "images").glob("*.nii.gz"))
     lbls = sorted((manual_dir / "labels").glob("*.nii.gz"))
@@ -180,6 +196,29 @@ def cmd_verify(cfg, manual_dir: Path, auto_dir: Path):
     present_manual = len(manual_ids & lbl_cases)
     print(f"auto       : {len(lbl_cases) - present_manual} untouched, "
           f"{present_manual} manual")
+
+    both = manual_ids & ignored_ids
+    if both:
+        print(f"\nWARNING: {len(both)} case(s) are both labelled and ignored; "
+              f"the label wins:")
+        for n in sorted(both)[:10]:
+            print(f"  {n}")
+
+    if ignored_ids:
+        print(f"\nignored (no stenosis, EXCLUDED from training): "
+              f"{len(ignored_ids)}")
+        for n in sorted(ignored_ids)[:10]:
+            rec = ignored[n]
+            reason = rec.get("reason", "") if isinstance(rec, dict) else ""
+            print(f"  {n}" + (f"   [{reason}]" if reason else ""))
+        if len(ignored_ids) > 10:
+            print(f"  ... and {len(ignored_ids) - 10} more")
+
+    trainable = len(lbl_cases) - len(ignored_ids)
+    print(f"\ntrainable  : {trainable} case(s)  "
+          f"({len(lbl_cases)} total - {len(ignored_ids)} ignored)")
+    print(f"to do      : {len(lbl_cases) - len(manual_ids) - len(ignored_ids)} "
+          f"case(s) still need a decision")
 
     if img_ids - lbl_ids:
         print("\nWARNING: images without labels:")

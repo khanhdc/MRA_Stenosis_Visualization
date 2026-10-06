@@ -45,6 +45,7 @@ MANUAL_DIR = CFG.get("manual_data_dir", os.path.join(BASE, "training_data_manual
 MANUAL_IMG_DIR = os.path.join(MANUAL_DIR, "images")
 MANUAL_LBL_DIR = os.path.join(MANUAL_DIR, "labels")
 MANIFEST_PATH = os.path.join(MANUAL_DIR, "manual_labels.json")
+IGNORE_PATH = os.path.join(MANUAL_DIR, "ignored_cases.json")
 
 # Defaults come from config.json so the viewer starts on the batch defaults.
 DEFAULTS = {
@@ -394,23 +395,48 @@ def case_done_map():
             for i in range(len(images))}
 
 
+def load_ignored():
+    """Cases the annotator marked as having no stenosis (excluded from training)."""
+    if not os.path.exists(IGNORE_PATH):
+        return {}
+    try:
+        with open(IGNORE_PATH) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_ignored(data):
+    """Write atomically so a crash mid-write cannot lose the ignore list."""
+    tmp = IGNORE_PATH + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+    os.replace(tmp, IGNORE_PATH)
+
+
+def case_name(i):
+    return os.path.basename(images[i]).replace(".nii.gz", "")
+
+
 # =========================== WIDGETS (in window 1) ===========================
 from matplotlib.widgets import RadioButtons
 ax_gamma = fig2d.add_axes([0.15, 0.31, 0.7, 0.03])
 ax_thr = fig2d.add_axes([0.15, 0.25, 0.7, 0.03])
 ax_scale = fig2d.add_axes([0.15, 0.19, 0.7, 0.03])
 ax_sl = fig2d.add_axes([0.15, 0.13, 0.7, 0.03])
-ax_prev = fig2d.add_axes([0.07, 0.03, 0.13, 0.055])
-ax_next = fig2d.add_axes([0.21, 0.03, 0.13, 0.055])
-ax_unlab = fig2d.add_axes([0.35, 0.03, 0.17, 0.055])
-ax_save = fig2d.add_axes([0.53, 0.03, 0.20, 0.055])
-ax_meth = fig2d.add_axes([0.77, 0.03, 0.15, 0.055])
+ax_prev = fig2d.add_axes([0.03, 0.03, 0.11, 0.055])
+ax_next = fig2d.add_axes([0.155, 0.03, 0.11, 0.055])
+ax_unlab = fig2d.add_axes([0.28, 0.03, 0.15, 0.055])
+ax_save = fig2d.add_axes([0.44, 0.03, 0.19, 0.055])
+ax_ign = fig2d.add_axes([0.645, 0.03, 0.15, 0.055])
+ax_meth = fig2d.add_axes([0.81, 0.03, 0.16, 0.055])
 fig2d.subplots_adjust(bottom=0.38)
 
 readout = fig2d.text(0.5, 0.103, "", ha="center", va="bottom", fontsize=9)
 helptext = fig2d.text(
     0.5, 0.095,
-    "keys:  <- -> case   [ ] slice   1/2 method   G/T/O gamma/thr/scale   S save",
+    "keys:  <- -> case   [ ] slice   1/2 method   G/T/O gamma/thr/scale   S save   I ignore",
     ha="center", va="bottom", fontsize=7.5, color="0.4")
 
 gamma_slider = Slider(ax_gamma, "Gamma", 0.1, 5.0,
@@ -426,6 +452,7 @@ btn_unlab = Button(ax_unlab, "Next Unlabeled >")
 method_radio = RadioButtons(ax_meth, ("otsu", "frangi"),
                             active=METHOD_RADIO_INDEX.get(DEFAULTS["method"], 0))
 btn_save = Button(ax_save, "Save Manual Label")
+btn_ign = Button(ax_ign, "Ignore Case")
 
 case_idx = [0]
 SUPPRESS = set()
@@ -520,6 +547,12 @@ def load_new_case(idx):
     state = load_case(idx)
     btn_save.label.set_text("Save Manual Label")
     btn_save.color = "0.85"
+    if state.name in load_ignored():
+        btn_ign.label.set_text("IGNORED")
+        btn_ign.color = "0.95"
+    else:
+        btn_ign.label.set_text("Ignore Case")
+        btn_ign.color = "0.85"
     n_sl = state.vol.shape[0]
     sl_slider.valmax = n_sl - 1
     sl_slider.ax.set_xlim(0, n_sl - 1)
@@ -553,18 +586,45 @@ def next_case(event):
     load_new_case(case_idx[0])
 
 
+def toggle_ignore(event=None):
+    """Mark the current case as 'no stenosis, exclude from training', or undo.
+
+    Toggling means an accidental ignore is always one keypress away from being
+    reverted, without navigating anywhere.
+    """
+    data = load_ignored()
+    name = state.name
+    if name in data:
+        del data[name]
+        btn_ign.label.set_text("Ignore Case")
+        btn_ign.color = "0.85"
+        print(f"Un-ignored (back in the training set): {name}")
+    else:
+        data[name] = {
+            "reason": "no stenosis",
+            "ignored_at": __import__("datetime").datetime.now().isoformat(
+                timespec="seconds"),
+        }
+        btn_ign.label.set_text("IGNORED")
+        btn_ign.color = "0.95"
+        print(f"Ignored (excluded from training): {name}")
+    save_ignored(data)
+    update_plot()
+
+
 def next_unlabeled(event=None):
     """Jump forward to the next case that has no manual label saved."""
     done = case_done_map()
+    ignored = load_ignored()
     n = len(images)
     for step in range(1, n + 1):
         j = (case_idx[0] + step) % n
-        if not done.get(j, False):
+        if not done.get(j, False) and case_name(j) not in ignored:
             if j != case_idx[0]:
                 case_idx[0] = j
                 load_new_case(j)
             return
-    print("All cases already have manual labels saved.")
+    print("All cases are either labelled or ignored.")
 
 
 def nudge(widget, delta):
@@ -581,6 +641,8 @@ def on_key(event):
         next_unlabeled(event)
     elif k == "s":
         save_manual_label(event)
+    elif k in ("i",):
+        toggle_ignore(event)
     elif k == "1":
         method_radio.set_active(0)
     elif k == "2":
@@ -682,6 +744,16 @@ def save_manual_label(event):
     with open(CONFIG_PATH, "w") as f:
         json.dump(cfg, f, indent=2)
 
+    # Saving a label means the case IS part of the training set, so drop any
+    # earlier "no stenosis" ignore rather than leaving the two contradicting.
+    ign = load_ignored()
+    if state.name in ign:
+        del ign[state.name]
+        save_ignored(ign)
+        btn_ign.label.set_text("Ignore Case")
+        btn_ign.color = "0.85"
+        print(f"  (cleared ignore flag for {state.name})")
+
     print(f"Saved manual label: {state.name} | method={method} | "
           f"thr={thr:.3f} gamma={gam:.2f} otsu_scale={osc:.2f} | "
           f"voxels={int(mask.sum())}")
@@ -701,6 +773,7 @@ btn_prev.on_clicked(prev_case)
 btn_next.on_clicked(next_case)
 btn_unlab.on_clicked(next_unlabeled)
 btn_save.on_clicked(save_manual_label)
+btn_ign.on_clicked(toggle_ignore)
 
 fig2d.canvas.mpl_connect("key_press_event", on_key)
 fig2d.canvas.draw_idle()
