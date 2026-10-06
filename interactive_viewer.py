@@ -141,12 +141,13 @@ def draw_wireframe(ax, w, h, d, color="0.4", lw=0.8, scale=(1.0, 1.0, 1.0)):
 SLICE_PLANE_COLOR = "cyan"
 
 
-def draw_slice_plane(ax, mask_volume, slice_idx, z_scale=1.0):
+def draw_slice_plane(ax, mask_volume, slice_idx, z_scale=1.0, alpha=0.15):
     """Show where the slice slider currently is, inside the 3D cube.
 
-    Draws a translucent quad across the full cross-section at the active slice,
-    plus the mask voxels on that slice so the vessel cross-section is visible in
-    3D context rather than only in the 2D panels.
+    One translucent quad spanning the entire cube cross-section at the active
+    slice. Deliberately not clipped to the mask: the plane is a position marker,
+    so it should read as the full slice extent of the cube rather than implying
+    the vessel is as wide as the cube.
 
     `z_scale` differs per window: the dots view uses raw slice indices for z,
     while the smooth view builds its mesh with spacing (1.5, 1, 1), so the same
@@ -163,20 +164,12 @@ def draw_slice_plane(ax, mask_volume, slice_idx, z_scale=1.0):
     slice_idx = int(np.clip(slice_idx, 0, n_sl - 1))
     z_pos = slice_idx * z_scale
 
-    # Full cross-section quad at the active slice.
     quad_z = np.full((2, 2), float(z_pos))
     ax.plot_surface(
         [0, w], [0, h], quad_z,
-        color=SLICE_PLANE_COLOR, alpha=0.15, edgecolor=SLICE_PLANE_COLOR,
+        color=SLICE_PLANE_COLOR, alpha=alpha, edgecolor=SLICE_PLANE_COLOR,
         linewidth=0.8, shade=False, zorder=1,
     )
-
-    # Mark the mask voxels on this slice so the plane is not just a marker.
-    yy, xx = np.nonzero(np.asarray(mask_volume[slice_idx]) > 0)
-    if len(xx) > 0:
-        ax.scatter(xx, yy, np.full(len(xx), z_pos), c=SLICE_PLANE_COLOR,
-                   s=16, alpha=0.95, depthshade=False, linewidths=0,
-                   zorder=2)
 
 
 class ViewerState:
