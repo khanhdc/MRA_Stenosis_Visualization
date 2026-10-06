@@ -17,6 +17,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 from matplotlib.widgets import Slider, Button
 from matplotlib.patches import Rectangle
+from matplotlib.colors import to_rgba
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from PIL import Image
 from scipy.ndimage import distance_transform_edt
 from skimage.morphology import skeletonize
@@ -141,13 +143,20 @@ def draw_wireframe(ax, w, h, d, color="0.4", lw=0.8, scale=(1.0, 1.0, 1.0)):
 SLICE_PLANE_COLOR = "cyan"
 
 
-def draw_slice_plane(ax, mask_volume, slice_idx, z_scale=1.0, alpha=0.15):
+def draw_slice_plane(ax, mask_volume, slice_idx, z_scale=1.0, alpha=0.15,
+                     edge_alpha=0.95):
     """Show where the slice slider currently is, inside the 3D cube.
 
     One translucent quad spanning the entire cube cross-section at the active
     slice. Deliberately not clipped to the mask: the plane is a position marker,
     so it should read as the full slice extent of the cube rather than implying
     the vessel is as wide as the cube.
+
+    Drawn as an explicit Poly3DCollection rather than plot_surface. plot_surface
+    renders a single 2x2 quad so faintly that it is effectively invisible
+    (measured at ~350 changed pixels on a real mask); the same quad as a
+    Poly3DCollection changes ~25k pixels. Face/edge RGBA are passed explicitly
+    because the alpha= keyword did not composite reliably.
 
     `z_scale` differs per window: the dots view uses raw slice indices for z,
     while the smooth view builds its mesh with spacing (1.5, 1, 1), so the same
@@ -164,12 +173,18 @@ def draw_slice_plane(ax, mask_volume, slice_idx, z_scale=1.0, alpha=0.15):
     slice_idx = int(np.clip(slice_idx, 0, n_sl - 1))
     z_pos = slice_idx * z_scale
 
-    quad_z = np.full((2, 2), float(z_pos))
-    ax.plot_surface(
-        [0, w], [0, h], quad_z,
-        color=SLICE_PLANE_COLOR, alpha=alpha, edgecolor=SLICE_PLANE_COLOR,
-        linewidth=0.8, shade=False, zorder=1,
-    )
+    quad = [(0, 0, z_pos), (w, 0, z_pos), (w, h, z_pos), (0, h, z_pos)]
+    ax.add_collection3d(Poly3DCollection(
+        [quad],
+        facecolors=[to_rgba(SLICE_PLANE_COLOR, alpha)],
+        edgecolors=[to_rgba(SLICE_PLANE_COLOR, edge_alpha)],
+        linewidths=1.0,
+    ))
+
+    # Solid outline so the slice boundary stays readable even when the fill is
+    # washed out against a dense mask.
+    ax.plot([0, w, w, 0, 0], [0, 0, h, h, 0], [z_pos] * 5,
+            color=SLICE_PLANE_COLOR, lw=1.2, alpha=edge_alpha)
 
 
 class ViewerState:
