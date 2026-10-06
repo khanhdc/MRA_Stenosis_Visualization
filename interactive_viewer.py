@@ -187,6 +187,82 @@ def draw_slice_plane(ax, mask_volume, slice_idx, z_scale=1.0, alpha=0.15,
             color=SLICE_PLANE_COLOR, lw=1.2, alpha=edge_alpha)
 
 
+# =========================== 3D VIEW ORIENTATION ===========================
+# Rendering used to end with view_init(elev=25, azim=-60), which threw away any
+# camera rotation on every slider move - so the view could never be changed
+# while scrolling.  ax.clear() does NOT reset elev/azim (verified on mpl 3.9.4),
+# so dropping those calls is enough to make rotation stick; presets are layered
+# on top for deliberate axis changes.
+#
+# Note the slice axis always reads vertically on screen: matplotlib projects
+# z with zero horizontal component at every elev/azim (measured |dx| < 5e-18
+# across 24 angles).  Presets change how the cube is looked at, not the
+# direction the plane sweeps.
+
+VIEW_DEFAULT = (25, -60)
+VIEW_PRESETS = [
+    ("iso", 25, -60),
+    ("top", 89, -60),
+    ("front", 0, -90),
+    ("side", 0, 0),
+    ("diag", 30, -135),
+]
+view_state = {"i": 0}
+VIEW_BASE = {"v1": "", "v2": ""}
+
+
+def base_title(name, mask_volume, slice_idx):
+    """Title text for a 3D window, without the camera angle on the end."""
+    return (f"{name}  |  voxels={int(mask_volume.sum())}"
+            + (f"  |  slice {int(slice_idx)}" if slice_idx is not None else ""))
+
+
+def view_suffix(ax):
+    return f"  view=({ax.elev:.0f},{azim_wrap(ax.azim):.0f})"
+
+
+def azim_wrap(a):
+    """Report azimuth in -180..180 so the readout matches the dial."""
+    return (a + 180.0) % 360.0 - 180.0
+
+
+def _full_title(ax, key):
+    return VIEW_BASE[key] + view_suffix(ax)
+
+
+def set_view_title(ax, key, text):
+    VIEW_BASE[key] = text
+    ax.set_title(_full_title(ax, key))
+
+
+def refresh_view_titles(fig, key, ax):
+    """Keep the live view angle accurate after a mouse rotation.
+
+    draw_event fires after every redraw, so this would re-schedule itself
+    forever unless it only redraws when the text actually changed.
+    """
+    want = _full_title(ax, key)
+    if ax.get_title() != want:
+        ax.set_title(want)
+        fig.canvas.draw_idle()
+
+
+def apply_view():
+    """Put both 3D windows on the current preset and redraw them."""
+    _, elev, azim = VIEW_PRESETS[view_state["i"]]
+    for ax in (ax_3d_v1, ax_3d):
+        ax.view_init(elev=elev, azim=azim)
+    refresh_title_now()
+    fig3d_v1.canvas.draw_idle()
+    fig3d.canvas.draw_idle()
+
+
+def refresh_title_now():
+    for key, ax in (("v1", ax_3d_v1), ("v2", ax_3d)):
+        if VIEW_BASE[key]:
+            ax.set_title(_full_title(ax, key))
+
+
 class ViewerState:
     pass
 
@@ -340,10 +416,8 @@ def render_3d_v1(mask_volume, slice_idx=None):
     # box 8.5 units past zlim and clipped its top off.
     draw_wireframe(ax_3d_v1, w, h, n_sl3, scale=(1.0, 1.0, 1.0))
     draw_slice_plane(ax_3d_v1, mask_volume, slice_idx, z_scale=1.0)
-    ax_3d_v1.set_title(
-        f"V1_3D Mask (dots)  |  voxels={int(mask_volume.sum())}"
-        + (f"  |  slice {int(slice_idx)}" if slice_idx is not None else ""))
-    ax_3d_v1.view_init(elev=25, azim=-60)
+    set_view_title(ax_3d_v1, "v1", base_title(
+        "V1_3D Mask (dots)", mask_volume, slice_idx))
 
 
 # =========================== WINDOW 3: 3D V2 (smooth) ===========================
@@ -372,10 +446,8 @@ def render_3d(mask_volume, slice_idx=None):
         # Small masks are exactly the severe-stenosis cases where knowing the
         # slice position matters most, so keep the plane on this branch too.
         draw_slice_plane(ax_3d, mask_volume, slice_idx, z_scale=1.0)
-        ax_3d.set_title(
-            f"V2_3D Mask (smooth)  |  voxels={int(mask_volume.sum())}"
-            + (f"  |  slice {int(slice_idx)}" if slice_idx is not None else ""))
-        ax_3d.view_init(elev=25, azim=-60)
+        set_view_title(ax_3d, "v2", base_title(
+            "V2_3D Mask (smooth)", mask_volume, slice_idx))
         return
 
     # Smooth the binary mask a bit, then build an iso-surface with marching cubes.
@@ -400,10 +472,8 @@ def render_3d(mask_volume, slice_idx=None):
     draw_wireframe(ax_3d, w, h, n_sl3, scale=spacing)
     # The mesh was built with spacing (1.5, 1, 1), so slice z is 1.5x the index.
     draw_slice_plane(ax_3d, mask_volume, slice_idx, z_scale=spacing[0])
-    ax_3d.set_title(
-        f"V2_3D Mask (smooth)  |  voxels={int(mask_volume.sum())}"
-        + (f"  |  slice {int(slice_idx)}" if slice_idx is not None else ""))
-    ax_3d.view_init(elev=25, azim=-60)
+    set_view_title(ax_3d, "v2", base_title(
+        "V2_3D Mask (smooth)", mask_volume, slice_idx))
 
 
 def render_all_3d(mask_volume, slice_idx=None):
@@ -499,7 +569,7 @@ fig2d.subplots_adjust(bottom=0.38)
 readout = fig2d.text(0.5, 0.103, "", ha="center", va="bottom", fontsize=9)
 helptext = fig2d.text(
     0.5, 0.095,
-    "keys:  <- -> case   [ ] slice   1/2 method   G/T/O gamma/thr/scale   S save   I ignore",
+    "keys:  <- -> case   [ ] slice   1/2 method   G/T/O gamma/thr/scale   S save   I ignore   V view  Z reset view",
     ha="center", va="bottom", fontsize=7.5, color="0.4")
 
 gamma_slider = Slider(ax_gamma, "Gamma", 0.1, 5.0,
@@ -720,6 +790,18 @@ def on_key(event):
         nudge(thr_slider, 0.005)
     elif k == "o":
         nudge(scale_slider, 0.01)
+    elif k == "v":
+        view_state["i"] = (view_state["i"] + 1) % len(VIEW_PRESETS)
+        apply_view()
+        return
+    elif k == "z":
+        if view_state["i"] != 0:
+            view_state["i"] = 0
+            apply_view()
+        else:
+            fig3d.canvas.draw_idle()
+            fig3d_v1.canvas.draw_idle()
+        return
     else:
         return
     fig2d.canvas.draw_idle()
@@ -839,6 +921,14 @@ btn_save.on_clicked(save_manual_label)
 btn_ign.on_clicked(toggle_ignore)
 
 fig2d.canvas.mpl_connect("key_press_event", on_key)
+# The 3D windows take focus when clicked, which would otherwise swallow every
+# shortcut (slice, save, ignore) until the user clicked back into window 1.
+fig3d.canvas.mpl_connect("key_press_event", on_key)
+fig3d_v1.canvas.mpl_connect("key_press_event", on_key)
+fig3d.canvas.mpl_connect("draw_event",
+                         lambda ev: refresh_view_titles(fig3d, "v2", ax_3d))
+fig3d_v1.canvas.mpl_connect("draw_event",
+                            lambda ev: refresh_view_titles(fig3d_v1, "v1", ax_3d_v1))
 fig2d.canvas.draw_idle()
 
 plt.show()
