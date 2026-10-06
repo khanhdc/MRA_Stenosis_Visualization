@@ -10,9 +10,13 @@ test/
 
 # Auto-generated pseudo-masks. Regenerate with:
 #   python batch_run.py
-# The manual set below is the one that trains the model, so this
-# directory does not need history.
 training_data/
+
+# Manual labeling set: image/label cubes + manifests.
+# Patient-derived data - kept local, never versioned. Regenerate the cubes
+# with the viewer (S key) or export_manual.py. The manifest is reproducible
+# from the same sources, so it is not tracked either.
+training_data_manual/
 
 # Python
 __pycache__/
