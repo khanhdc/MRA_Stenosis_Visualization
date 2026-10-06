@@ -132,8 +132,13 @@ def draw_wireframe(ax, w, h, d, color="0.4", lw=0.8, scale=(1.0, 1.0, 1.0)):
     corners = [np.array(c) * np.array([sx, sy, sz]) for c in product([0, w], [0, h], [0, d])]
     for i in range(8):
         for j in range(i + 1, 8):
-            diff = np.abs(corners[i] - corners[j]).sum()
-            if diff == max(w, h, d):
+            # An edge of the box is any pair of corners that differs in exactly
+            # one axis.  The old test (diff == max(w, h, d)) only matched edges
+            # whose SCALED length equalled the largest UNSCALED dimension, so it
+            # drew 8 of 12 edges with scale (1,1,1) - no vertical edges at all -
+            # and only 4 of 12 in the smooth view.
+            delta = np.abs(corners[i] - corners[j])
+            if np.count_nonzero(delta) == 1 and delta.max() > 0:
                 xs = [corners[i][0], corners[j][0]]
                 ys = [corners[i][1], corners[j][1]]
                 zs = [corners[i][2], corners[j][2]]
@@ -158,9 +163,10 @@ def draw_slice_plane(ax, mask_volume, slice_idx, z_scale=1.0, alpha=0.15,
     Poly3DCollection changes ~25k pixels. Face/edge RGBA are passed explicitly
     because the alpha= keyword did not composite reliably.
 
-    `z_scale` differs per window: the dots view uses raw slice indices for z,
-    while the smooth view builds its mesh with spacing (1.5, 1, 1), so the same
-    slice sits at a different z there.
+    `z_scale` was introduced because the smooth view once built its mesh with a
+    fabricated 1.5x z spacing. The data is 1 mm isotropic, so both windows now
+    use z_scale=1.0 and a slice sits at the same height in either one; the
+    parameter is kept so per-window scaling stays explicit at the call site.
 
     Takes the whole volume so the slice index is clamped here - callers must
     never index with an unvalidated value.
@@ -455,10 +461,19 @@ def render_3d(mask_volume, slice_idx=None):
     from scipy.ndimage import gaussian_filter
 
     vol_s = gaussian_filter(mask_volume.astype(np.float64), sigma=0.6, mode="constant")
-    spacing = (1.5, 1.0, 1.0)  # z slices are thicker than xy pixels
+    # Data is 1 mm isotropic (nifti zooms 1,1,1), so no axis is stretched.
     verts, faces, normals, _ = marching_cubes(
-        vol_s, level=0.5, spacing=spacing, gradient_direction="ascent"
+        vol_s, level=0.5, spacing=(1.0, 1.0, 1.0), gradient_direction="ascent"
     )
+    # marching_cubes returns verts in ARRAY order (axis0, axis1, axis2) of a
+    # (slice, row, col) volume, but Poly3DCollection reads them as (x, y, z).
+    # Taken literally the slice axis landed on screen-X: a blob at slice 8,
+    # col 21 measured mesh x=12 (=slice), z=21 (=col) - i.e. the vessel was
+    # plotted lying down and the plane swept across its width instead of
+    # along it.  Reorder to (x=col, y=row, z=slice) to match the dots view.
+    verts = verts[:, [2, 1, 0]]
+    if normals is not None:
+        normals = normals[:, [2, 1, 0]]
 
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
@@ -468,10 +483,12 @@ def render_3d(mask_volume, slice_idx=None):
     ax_3d.add_collection3d(mesh)
     surface3d[0] = mesh
 
-    ax_3d.auto_scale_xyz([0, w * spacing[1]], [0, h * spacing[1]], [0, n_sl3 * spacing[0]])
-    draw_wireframe(ax_3d, w, h, n_sl3, scale=spacing)
-    # The mesh was built with spacing (1.5, 1, 1), so slice z is 1.5x the index.
-    draw_slice_plane(ax_3d, mask_volume, slice_idx, z_scale=spacing[0])
+    # Same frame as the dots view: x 0..w, y inverted (row 0 at top), z = slice.
+    ax_3d.set_xlim(0, w)
+    ax_3d.set_ylim(h, 0)
+    ax_3d.set_zlim(0, n_sl3)
+    draw_wireframe(ax_3d, w, h, n_sl3, scale=(1.0, 1.0, 1.0))
+    draw_slice_plane(ax_3d, mask_volume, slice_idx, z_scale=1.0)
     set_view_title(ax_3d, "v2", base_title(
         "V2_3D Mask (smooth)", mask_volume, slice_idx))
 
